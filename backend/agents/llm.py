@@ -4,18 +4,19 @@ Supports Groq (llama-3.3-70b-versatile) as the primary LLM, with fallback to
 Gemini (gemini-1.5-flash) if Groq returns errors or has quota issues.
 """
 
-import os
 import json
-from typing import Optional, Dict, Any
-from groq import Groq
+import os
+from typing import Any
+
 import google.generativeai as genai
+from groq import Groq
 
 # Configuration constants
 GROQ_MODEL = "llama-3.3-70b-versatile"
 GEMINI_MODEL = "gemini-1.5-flash"
 
 
-def get_groq_client() -> Optional[Groq]:
+def get_groq_client() -> Groq | None:
     """Instantiate a Groq client if the API key is present.
 
     Returns:
@@ -27,7 +28,9 @@ def get_groq_client() -> Optional[Groq]:
     return Groq(api_key=api_key)
 
 
-def get_gemini_model(system_instruction: str, json_mode: bool = False) -> genai.GenerativeModel:
+def get_gemini_model(
+    system_instruction: str, json_mode: bool = False
+) -> genai.GenerativeModel:
     """Configure and return a Gemini GenerativeModel instance.
 
     Args:
@@ -47,7 +50,7 @@ def get_gemini_model(system_instruction: str, json_mode: bool = False) -> genai.
     return genai.GenerativeModel(
         model_name=GEMINI_MODEL,
         system_instruction=system_instruction,
-        generation_config=generation_config
+        generation_config=generation_config,
     )
 
 
@@ -55,7 +58,7 @@ def call_llm(
     system_prompt: str,
     user_prompt: str,
     json_mode: bool = False,
-    override_reasoning_trace: bool = False
+    override_reasoning_trace: bool = False,
 ) -> tuple[str, str]:
     """Call Groq LLM with fallback to Gemini.
 
@@ -80,33 +83,44 @@ def call_llm(
                 "issue": "Offline placeholder",
                 "eta_minutes": 0,
                 "recommended_action": "Configure GROQ_API_KEY or GEMINI_API_KEY in .env",
-                "confidence": "LOW"
+                "confidence": "LOW",
             }
-            return json.dumps(mock_json), "Reasoning: Offline fallback mock data generated because no LLM API keys are set."
-        return "Stadium response (Offline Mode). Please set GROQ_API_KEY or GEMINI_API_KEY.", "Reasoning: Offline fallback mock data generated because no LLM API keys are set."
+            return (
+                json.dumps(mock_json),
+                "Reasoning: Offline fallback mock data generated because no LLM API keys are set.",
+            )
+        return (
+            "Stadium response (Offline Mode). Please set GROQ_API_KEY or GEMINI_API_KEY.",
+            "Reasoning: Offline fallback mock data generated because no LLM API keys are set.",
+        )
 
     # Try Groq first
     if groq_client:
         try:
             print(f"Calling Groq LLM ({GROQ_MODEL})...")
-            kwargs: Dict[str, Any] = {}
+            kwargs: dict[str, Any] = {}
             if json_mode:
                 kwargs["response_format"] = {"type": "json_object"}
 
             completion = groq_client.chat.completions.create(
                 messages=[
                     {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt}
+                    {"role": "user", "content": user_prompt},
                 ],
                 model=GROQ_MODEL,
                 temperature=0.2,
-                **kwargs
+                **kwargs,
             )
             response_text = completion.choices[0].message.content
-            return response_text, f"Successfully executed primary Groq model ({GROQ_MODEL})."
+            return (
+                response_text,
+                f"Successfully executed primary Groq model ({GROQ_MODEL}).",
+            )
 
         except Exception as e:
-            print(f"Groq API call failed or quota exceeded: {e}. Falling back to Gemini...")
+            print(
+                f"Groq API call failed or quota exceeded: {e}. Falling back to Gemini..."
+            )
             # Fall through to Gemini
 
     # Try Gemini fallback
@@ -115,7 +129,10 @@ def call_llm(
             print(f"Calling Gemini Fallback ({GEMINI_MODEL})...")
             model = get_gemini_model(system_prompt, json_mode)
             response = model.generate_content(user_prompt)
-            return response.text, f"Groq failed. Successfully executed fallback Gemini model ({GEMINI_MODEL})."
+            return (
+                response.text,
+                f"Groq failed. Successfully executed fallback Gemini model ({GEMINI_MODEL}).",
+            )
         except Exception as e:
             print(f"Gemini API call failed: {e}")
             raise RuntimeError(f"Both Groq and Gemini API calls failed: {e}") from e

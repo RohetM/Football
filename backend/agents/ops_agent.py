@@ -7,7 +7,8 @@ generate a dispatch recommendation and reasoning trace.
 
 import json
 import os
-from typing import Dict, Any, List, Optional
+from typing import Any
+
 from backend.agents.llm import call_llm
 
 DEFAULT_STATE_PATH = os.path.join(
@@ -72,8 +73,8 @@ def compute_manhattan_distance(loc1: str, loc2: str) -> int:
 
 
 def get_nearest_volunteer(
-    incident_location: str, volunteers: List[Dict[str, Any]]
-) -> tuple[Optional[Dict[str, Any]], List[Dict[str, Any]]]:
+    incident_location: str, volunteers: list[dict[str, Any]]
+) -> tuple[dict[str, Any] | None, list[dict[str, Any]]]:
     """Find the nearest idle volunteer and calculate distances for all volunteers.
 
     Args:
@@ -92,7 +93,7 @@ def get_nearest_volunteer(
 
     # Filter for IDLE volunteers first
     idle_volunteers = [v for v in calculated_list if v["status"] == "IDLE"]
-    
+
     # Sort idle volunteers by distance
     if idle_volunteers:
         idle_volunteers.sort(key=lambda x: x["distance"])
@@ -109,8 +110,8 @@ def query_ops_agent(
     incident_description: str,
     incident_type: str,
     incident_location: str,
-    file_path: str = DEFAULT_STATE_PATH
-) -> Dict[str, Any]:
+    file_path: str = DEFAULT_STATE_PATH,
+) -> dict[str, Any]:
     """Process an incident and generate LLM-guided volunteer dispatch recommendations.
 
     Args:
@@ -126,7 +127,7 @@ def query_ops_agent(
     volunteers = []
     if os.path.exists(file_path):
         try:
-            with open(file_path, "r", encoding="utf-8") as f:
+            with open(file_path, encoding="utf-8") as f:
                 state = json.load(f)
                 volunteers = state.get("volunteers", [])
         except Exception as e:
@@ -140,10 +141,10 @@ def query_ops_agent(
         "incident": {
             "description": incident_description,
             "type": incident_type,
-            "location": incident_location
+            "location": incident_location,
         },
         "nearest_computed_volunteer": nearest,
-        "all_volunteers_analysis": calculated_list
+        "all_volunteers_analysis": calculated_list,
     }
 
     # 4. Invoke LLM in JSON mode
@@ -151,13 +152,15 @@ def query_ops_agent(
         response_text, raw_trace = call_llm(
             system_prompt=SYSTEM_PROMPT,
             user_prompt=json.dumps(user_prompt),
-            json_mode=True
+            json_mode=True,
         )
 
         dispatch_decision = json.loads(response_text)
-        
+
         # Append LLM execution trace to reasoning
-        dispatch_decision["reasoning"] = f"{dispatch_decision.get('reasoning', '')} {raw_trace}"
+        dispatch_decision["reasoning"] = (
+            f"{dispatch_decision.get('reasoning', '')} {raw_trace}"
+        )
         return dispatch_decision
 
     except Exception as e:
@@ -167,11 +170,11 @@ def query_ops_agent(
             return {
                 "recommendation": f"STeward/Volunteer {nearest['name']} ({nearest['id']}) report to {incident_location} for {incident_type} assistance immediately.",
                 "assigned_volunteer_id": nearest["id"],
-                "reasoning": f"Programmatic fallback dispatch due to LLM error: {str(e)}"
+                "reasoning": f"Programmatic fallback dispatch due to LLM error: {str(e)}",
             }
         else:
             return {
                 "recommendation": "No volunteers available. Escalate to Stadium Command Room.",
                 "assigned_volunteer_id": None,
-                "reasoning": f"Programmatic fallback. No volunteers found in state. LLM error: {str(e)}"
+                "reasoning": f"Programmatic fallback. No volunteers found in state. LLM error: {str(e)}",
             }

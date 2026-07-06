@@ -7,7 +7,8 @@ analysis and operational recommendations.
 
 import json
 import os
-from typing import Dict, Any
+from typing import Any
+
 from backend.agents.llm import call_llm
 
 DEFAULT_STATE_PATH = os.path.join(
@@ -55,11 +56,11 @@ def load_stadium_state(file_path: str = DEFAULT_STATE_PATH) -> str:
     """
     if not os.path.exists(file_path):
         return "{}"
-    with open(file_path, "r", encoding="utf-8") as f:
+    with open(file_path, encoding="utf-8") as f:
         return f.read()
 
 
-def query_crowd_agent(file_path: str = DEFAULT_STATE_PATH) -> Dict[str, Any]:
+def query_crowd_agent(file_path: str = DEFAULT_STATE_PATH) -> dict[str, Any]:
     """Analyze stadium state and predict crowd bottlenecks using the LLM.
 
     Args:
@@ -77,14 +78,12 @@ def query_crowd_agent(file_path: str = DEFAULT_STATE_PATH) -> Dict[str, Any]:
     # 3. Call LLM
     try:
         response_text, raw_trace = call_llm(
-            system_prompt=SYSTEM_PROMPT,
-            user_prompt=user_prompt,
-            json_mode=True
+            system_prompt=SYSTEM_PROMPT, user_prompt=user_prompt, json_mode=True
         )
 
         # 4. Parse output
         analysis = json.loads(response_text)
-        
+
         # Append LLM execution trace to the reasoning field for frontend transparency
         analysis["reasoning"] = f"{analysis.get('reasoning', '')} {raw_trace}"
         return analysis
@@ -96,5 +95,5 @@ def query_crowd_agent(file_path: str = DEFAULT_STATE_PATH) -> Dict[str, Any]:
             "eta_minutes": 0,
             "recommended_action": "Initiate manual crowd monitoring and physical patrols.",
             "confidence": "LOW",
-            "reasoning": f"Crowd Intel Agent exception: {str(e)}"
+            "reasoning": f"Crowd Intel Agent exception: {str(e)}",
         }

@@ -5,7 +5,6 @@ potential prompt injection and SQL injection patterns.
 """
 
 import re
-from typing import Optional
 
 
 def sanitize_text(text: str) -> str:
@@ -90,7 +89,7 @@ def detect_prompt_injection(text: str) -> bool:
     return False
 
 
-def validate_query(text: Optional[str], max_length: int = 500) -> tuple[bool, str, str]:
+def validate_query(text: str | None, max_length: int = 500) -> tuple[bool, str, str]:
     """Perform comprehensive validation on a user query.
 
     Args:
@@ -106,7 +105,11 @@ def validate_query(text: Optional[str], max_length: int = 500) -> tuple[bool, st
     sanitized = sanitize_text(text)
 
     if not validate_input_length(sanitized, max_length):
-        return False, sanitized, f"Query exceeds maximum length of {max_length} characters"
+        return (
+            False,
+            sanitized,
+            f"Query exceeds maximum length of {max_length} characters",
+        )
 
     if detect_sql_injection(sanitized):
         return False, sanitized, "Query contains forbidden characters or SQL commands"

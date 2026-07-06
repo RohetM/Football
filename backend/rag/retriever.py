@@ -5,7 +5,8 @@ relevance-ranked document context.
 """
 
 import os
-from typing import List, Dict, Any
+from typing import Any
+
 import chromadb
 from chromadb.utils import embedding_functions
 
@@ -29,11 +30,10 @@ class RAGRetriever:
             model_name="all-MiniLM-L6-v2"
         )
         self.collection = self.client.get_or_create_collection(
-            name=COLLECTION_NAME,
-            embedding_function=self.emb_fn
+            name=COLLECTION_NAME, embedding_function=self.emb_fn
         )
 
-    def retrieve(self, query: str, n_results: int = 3) -> List[Dict[str, Any]]:
+    def retrieve(self, query: str, n_results: int = 3) -> list[dict[str, Any]]:
         """Retrieve top N matching documents for a query.
 
         Args:
@@ -48,26 +48,29 @@ class RAGRetriever:
             return []
 
         try:
-            results = self.collection.query(
-                query_texts=[query],
-                n_results=n_results
-            )
-            
+            results = self.collection.query(query_texts=[query], n_results=n_results)
+
             formatted_results = []
             if not results or "documents" not in results or not results["documents"][0]:
                 return []
 
             documents = results["documents"][0]
             metadatas = results["metadatas"][0]
-            distances = results["distances"][0] if "distances" in results else [0.0] * len(documents)
+            distances = (
+                results["distances"][0]
+                if "distances" in results
+                else [0.0] * len(documents)
+            )
 
             for i in range(len(documents)):
-                formatted_results.append({
-                    "content": documents[i],
-                    "source": metadatas[i].get("source", "unknown"),
-                    "header": metadatas[i].get("header", "unknown"),
-                    "distance": distances[i]
-                })
+                formatted_results.append(
+                    {
+                        "content": documents[i],
+                        "source": metadatas[i].get("source", "unknown"),
+                        "header": metadatas[i].get("header", "unknown"),
+                        "distance": distances[i],
+                    }
+                )
 
             return formatted_results
 
@@ -92,7 +95,7 @@ def get_retriever() -> RAGRetriever:
     return _retriever
 
 
-def retrieve_context(query: str, n_results: int = 3) -> List[Dict[str, Any]]:
+def retrieve_context(query: str, n_results: int = 3) -> list[dict[str, Any]]:
     """Convenience function to retrieve context for a query.
 
     Args:

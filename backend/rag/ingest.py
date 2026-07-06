@@ -7,18 +7,21 @@ and stores them in a persistent ChromaDB database.
 
 import os
 import re
-from typing import List, Dict, Any
+from typing import Any
+
 import chromadb
 from chromadb.utils import embedding_functions
 
 # Configurable paths
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))
-KB_DIR = os.getenv("KNOWLEDGE_BASE_DIR", os.path.join(BASE_DIR, "data", "knowledge_base"))
+KB_DIR = os.getenv(
+    "KNOWLEDGE_BASE_DIR", os.path.join(BASE_DIR, "data", "knowledge_base")
+)
 DB_DIR = os.getenv("CHROMA_DB_DIR", os.path.join(BASE_DIR, "data", "chroma_db"))
 COLLECTION_NAME = "worldcup_kb"
 
 
-def parse_markdown_to_sections(file_path: str) -> List[Dict[str, str]]:
+def parse_markdown_to_sections(file_path: str) -> list[dict[str, str]]:
     """Parse markdown file and split it into sections based on headings.
 
     Args:
@@ -31,7 +34,7 @@ def parse_markdown_to_sections(file_path: str) -> List[Dict[str, str]]:
         print(f"Warning: file {file_path} does not exist.")
         return []
 
-    with open(file_path, "r", encoding="utf-8") as f:
+    with open(file_path, encoding="utf-8") as f:
         content = f.read()
 
     file_name = os.path.basename(file_path)
@@ -44,28 +47,24 @@ def parse_markdown_to_sections(file_path: str) -> List[Dict[str, str]]:
     # The first element contains introduction/title or Level 1 header
     intro = parts[0].strip()
     if intro:
-        sections.append({
-            "source": file_name,
-            "header": "Introduction",
-            "content": intro
-        })
+        sections.append(
+            {"source": file_name, "header": "Introduction", "content": intro}
+        )
 
     # Group the matching headers and contents
     i = 1
     while i < len(parts):
         header_marker = parts[i]  # e.g., '## '
-        header_and_body = parts[i+1] if i + 1 < len(parts) else ""
-        
+        header_and_body = parts[i + 1] if i + 1 < len(parts) else ""
+
         # Split header line from body
         header_lines = header_and_body.split("\n", 1)
         header = header_lines[0].strip()
         body = header_lines[1].strip() if len(header_lines) > 1 else ""
 
-        sections.append({
-            "source": file_name,
-            "header": header,
-            "content": f"## {header}\n{body}"
-        })
+        sections.append(
+            {"source": file_name, "header": header, "content": f"## {header}\n{body}"}
+        )
         i += 2
 
     return sections
@@ -89,8 +88,7 @@ def build_vector_db(kb_dir: str = KB_DIR, db_dir: str = DB_DIR) -> None:
 
     # Get or create collection
     collection = client.get_or_create_collection(
-        name=COLLECTION_NAME,
-        embedding_function=emb_fn
+        name=COLLECTION_NAME, embedding_function=emb_fn
     )
 
     # Clear existing documents in collection
@@ -100,20 +98,23 @@ def build_vector_db(kb_dir: str = KB_DIR, db_dir: str = DB_DIR) -> None:
         # Since we use simple client, we can delete by ids or recreate collection
         client.delete_collection(name=COLLECTION_NAME)
         collection = client.get_or_create_collection(
-            name=COLLECTION_NAME,
-            embedding_function=emb_fn
+            name=COLLECTION_NAME, embedding_function=emb_fn
         )
 
     # Gather knowledge base files
-    md_files = [f for f in os.listdir(kb_dir) if f.endswith((".md", ".txt"))] if os.path.exists(kb_dir) else []
-    
+    md_files = (
+        [f for f in os.listdir(kb_dir) if f.endswith((".md", ".txt"))]
+        if os.path.exists(kb_dir)
+        else []
+    )
+
     if not md_files:
         print(f"No knowledge base files found in: {kb_dir}")
         return
 
-    documents: List[str] = []
-    metadatas: List[Dict[str, Any]] = []
-    ids: List[str] = []
+    documents: list[str] = []
+    metadatas: list[dict[str, Any]] = []
+    ids: list[str] = []
     counter = 0
 
     for file_name in md_files:
@@ -125,20 +126,13 @@ def build_vector_db(kb_dir: str = KB_DIR, db_dir: str = DB_DIR) -> None:
             if not sec["content"].strip():
                 continue
             documents.append(sec["content"])
-            metadatas.append({
-                "source": sec["source"],
-                "header": sec["header"]
-            })
+            metadatas.append({"source": sec["source"], "header": sec["header"]})
             ids.append(f"doc_{counter}")
             counter += 1
 
     if documents:
         print(f"Adding {len(documents)} document chunks to vector database...")
-        collection.add(
-            documents=documents,
-            metadatas=metadatas,
-            ids=ids
-        )
+        collection.add(documents=documents, metadatas=metadatas, ids=ids)
         print("Ingestion completed successfully.")
     else:
         print("No content chunks found to ingest.")

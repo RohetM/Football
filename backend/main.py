@@ -1,32 +1,46 @@
 """FastAPI central orchestrator for WorldCup OS.
 
 Exposes endpoints for the Fan, Crowd, and Ops Agents, handles input validation,
-CORS, custom rate limiting, and simulation ticks.
+CORS, slowapi rate limiting, and simulation ticks.
 """
 
 import os
-from typing import Dict, Any, Optional
+from typing import Any
+
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
+
+from backend.agents.crowd_agent import query_crowd_agent
+from backend.agents.fan_agent import query_fan_agent
+from backend.agents.ops_agent import query_ops_agent
 
 # Import validators and agents
 from backend.security.validators import validate_query
-from backend.agents.fan_agent import query_fan_agent
-from backend.agents.crowd_agent import query_crowd_agent
-from backend.agents.ops_agent import query_ops_agent
-from backend.simulator.update_state import run_simulator_once, load_state
+from backend.simulator.update_state import load_state, run_simulator_once
+
+# Initialize slowapi limiter
+limiter = Limiter(key_func=get_remote_address)
 
 app = FastAPI(
     title="WorldCup OS Orchestrator API",
     description="GenAI stadium operations co-pilot backend",
-    version="1.0.0"
+    version="1.0.0",
 )
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # CORS configuration
 # Restricted to the Streamlit local frontend origin by default, customizable via environment variables
-cors_origins_raw = os.getenv("CORS_ORIGINS", "http://localhost:8501,http://127.0.0.1:8501")
-CORS_ORIGINS = [origin.strip() for origin in cors_origins_raw.split(",") if origin.strip()]
+cors_origins_raw = os.getenv(
+    "CORS_ORIGINS", "http://localhost:8501,http://127.0.0.1:8501"
+)
+CORS_ORIGINS = [
+    origin.strip() for origin in cors_origins_raw.split(",") if origin.strip()
+]
 
 app.add_middleware(
     CORSMiddleware,
@@ -39,7 +53,8 @@ app.add_middleware(
 # Custom In-Memory Rate Limiting for security to prevent API flooding.
 # Map of IP to list of request timestamps.
 import time
-RATE_LIMIT_TIMESTAMPS: Dict[str, list[float]] = {}
+
+RATE_LIMIT_TIMESTAMPS: dict[str, list[float]] = {}
 RATE_LIMIT_PER_MINUTE = int(os.getenv("RATE_LIMIT_PER_MINUTE", "20"))
 
 
@@ -72,16 +87,22 @@ def check_rate_limit(ip: str) -> bool:
 class FanQueryRequest(BaseModel):
     query: str = Field(..., max_length=500, description="The fan question text.")
     language: str = Field("en", description="Target response ISO language code.")
-    accessibility_needs: Optional[str] = Field(None, description="Special accessibility parameters.")
+    accessibility_needs: str | None = Field(
+        None, description="Special accessibility parameters."
+    )
 
 
 class OpsActionRequest(BaseModel):
     description: str = Field(..., description="Description of the incident.")
-    type: str = Field(..., description="Type/category of the incident (medical, security, accessibility).")
+    type: str = Field(
+        ...,
+        description="Type/category of the incident (medical, security, accessibility).",
+    )
     location: str = Field(..., description="Target stadium zone/gate.")
 
 
-@app.post("/api/fan-query", response_model=Dict[str, Any])
+@app.post("/api/fan-query", response_model=dict[str, Any])
+@limiter.limit("20/minute")
 async def handle_fan_query(request: Request, body: FanQueryRequest):
     """Secure endpoint for fan FAQs and accessibility assistance.
 
@@ -92,27 +113,24 @@ async def handle_fan_query(request: Request, body: FanQueryRequest):
     if not check_rate_limit(client_ip):
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail="Rate limit exceeded. Try again in a minute."
+            detail="Rate limit exceeded. Try again in a minute.",
         )
 
     # 2. Validate input text (length, injections)
     is_valid, sanitized_text, error_msg = validate_query(body.query)
     if not is_valid:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=error_msg
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=error_msg)
 
     # 3. Route request to Fan Agent
     result = query_fan_agent(
         query=sanitized_text,
         language=body.language,
-        accessibility_needs=body.accessibility_needs
+        accessibility_needs=body.accessibility_needs,
     )
     return result
 
 
-@app.get("/api/crowd-predict", response_model=Dict[str, Any])
+@app.get("/api/crowd-predict", response_model=dict[str, Any])
 async def handle_crowd_predict():
     """Predictive crowd bottlenecks endpoint.
 
@@ -122,7 +140,7 @@ async def handle_crowd_predict():
     return result
 
 
-@app.post("/api/ops-action", response_model=Dict[str, Any])
+@app.post("/api/ops-action", response_model=dict[str, Any])
 async def handle_ops_action(body: OpsActionRequest):
     """Operations incident report and volunteer dispatch router.
 
@@ -132,18 +150,23 @@ async def handle_ops_action(body: OpsActionRequest):
     if not body.description.strip():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Incident description cannot be empty."
+            detail="Incident description cannot be empty.",
         )
 
+    # Hardened input check (safety validation)
+    is_valid, sanitized_desc, error_msg = validate_query(body.description)
+    if not is_valid:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=error_msg)
+
     result = query_ops_agent(
-        incident_description=body.description,
+        incident_description=sanitized_desc,
         incident_type=body.type,
-        incident_location=body.location
+        incident_location=body.location,
     )
     return result
 
 
-@app.get("/api/stadium-state", response_model=Dict[str, Any])
+@app.get("/api/stadium-state", response_model=dict[str, Any])
 async def get_stadium_state():
     """Fetch current raw simulated stadium operational data."""
     try:
@@ -151,11 +174,11 @@ async def get_stadium_state():
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error reading stadium state: {str(e)}"
+            detail=f"Error reading stadium state: {str(e)}",
         )
 
 
-@app.post("/api/simulate-tick", response_model=Dict[str, Any])
+@app.post("/api/simulate-tick", response_model=dict[str, Any])
 async def trigger_simulation_tick():
     """Trigger a simulator step mutation on-demand."""
     try:
@@ -164,5 +187,5 @@ async def trigger_simulation_tick():
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error running simulation step: {str(e)}"
+            detail=f"Error running simulation step: {str(e)}",
         )

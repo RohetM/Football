@@ -8,7 +8,7 @@ import json
 import os
 import random
 from datetime import datetime
-from typing import Dict, Any
+from typing import Any
 
 # Target state file path
 DEFAULT_STATE_PATH = os.path.join(
@@ -16,7 +16,7 @@ DEFAULT_STATE_PATH = os.path.join(
 )
 
 
-def load_state(file_path: str = DEFAULT_STATE_PATH) -> Dict[str, Any]:
+def load_state(file_path: str = DEFAULT_STATE_PATH) -> dict[str, Any]:
     """Load the current state from JSON file.
 
     Args:
@@ -27,11 +27,11 @@ def load_state(file_path: str = DEFAULT_STATE_PATH) -> Dict[str, Any]:
     """
     if not os.path.exists(file_path):
         raise FileNotFoundError(f"State file not found at: {file_path}")
-    with open(file_path, "r", encoding="utf-8") as f:
+    with open(file_path, encoding="utf-8") as f:
         return json.load(f)
 
 
-def save_state(state: Dict[str, Any], file_path: str = DEFAULT_STATE_PATH) -> None:
+def save_state(state: dict[str, Any], file_path: str = DEFAULT_STATE_PATH) -> None:
     """Save the updated state to JSON file.
 
     Args:
@@ -43,7 +43,7 @@ def save_state(state: Dict[str, Any], file_path: str = DEFAULT_STATE_PATH) -> No
         json.dump(state, f, indent=2)
 
 
-def mutate_state(state: Dict[str, Any]) -> Dict[str, Any]:
+def mutate_state(state: dict[str, Any]) -> dict[str, Any]:
     """Mutate stadium state data to simulate active game day changes.
 
     Args:
@@ -66,7 +66,9 @@ def mutate_state(state: Dict[str, Any]) -> Dict[str, Any]:
             # Security wait time correlates with wait time
             sec_delta = random.choice([-2, -1, 0, 1, 2])
             current_sec = gate_info["security_wait_time_minutes"]
-            gate_info["security_wait_time_minutes"] = max(3, min(45, current_sec + sec_delta))
+            gate_info["security_wait_time_minutes"] = max(
+                3, min(45, current_sec + sec_delta)
+            )
 
             # Recalculate capacity utilization based on wait times
             gate_info["capacity_utilization"] = round(
@@ -83,7 +85,9 @@ def mutate_state(state: Dict[str, Any]) -> Dict[str, Any]:
                 info["description"] = "Running on time"
             else:
                 # Delay fluctuates
-                info["delay_minutes"] = max(5, info["delay_minutes"] + random.choice([-2, 0, 3]))
+                info["delay_minutes"] = max(
+                    5, info["delay_minutes"] + random.choice([-2, 0, 3])
+                )
         else:
             # Probability of new delay
             if random.random() < 0.05:
@@ -107,7 +111,9 @@ def mutate_state(state: Dict[str, Any]) -> Dict[str, Any]:
 
     # 5. Mutate weather temperature slightly
     temp = state.get("weather", {}).get("temperature_c", 24)
-    state["weather"]["temperature_c"] = max(15, min(38, temp + random.choice([-1, 0, 1])))
+    state["weather"]["temperature_c"] = max(
+        15, min(38, temp + random.choice([-1, 0, 1]))
+    )
 
     # 6. Randomly assign volunteer status if idle to busy or vice-versa
     for volunteer in state.get("volunteers", []):
@@ -133,6 +139,7 @@ def run_simulator_once(file_path: str = DEFAULT_STATE_PATH) -> None:
 
 if __name__ == "__main__":
     import time
+
     print("Starting continuous stadium state simulator (Ctrl+C to stop)...")
     while True:
         run_simulator_once()

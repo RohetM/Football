@@ -6,9 +6,10 @@ structure with the answer and reasoning trace.
 """
 
 import json
-from typing import Dict, Any, Optional, List
-from backend.rag.retriever import retrieve_context
+from typing import Any
+
 from backend.agents.llm import call_llm
+from backend.rag.retriever import retrieve_context
 
 SYSTEM_PROMPT = """You are the Fan Agent for "WorldCup OS," an intelligent co-pilot assisting stadium fans for the FIFA World Cup 2026.
 
@@ -34,7 +35,7 @@ JSON format:
 """
 
 
-def format_context(context_docs: List[Dict[str, Any]]) -> str:
+def format_context(context_docs: list[dict[str, Any]]) -> str:
     """Format retrieved document chunks into a single readable string.
 
     Args:
@@ -57,10 +58,8 @@ def format_context(context_docs: List[Dict[str, Any]]) -> str:
 
 
 def query_fan_agent(
-    query: str,
-    language: str = "en",
-    accessibility_needs: Optional[str] = None
-) -> Dict[str, Any]:
+    query: str, language: str = "en", accessibility_needs: str | None = None
+) -> dict[str, Any]:
     """Process a fan query, retrieve RAG context, and get a localized, accessible response.
 
     Args:
@@ -94,22 +93,22 @@ Retrieved Context:
     # 4. Call LLM (Groq with Gemini Fallback) in JSON mode
     try:
         response_text, raw_trace = call_llm(
-            system_prompt=SYSTEM_PROMPT,
-            user_prompt=user_prompt,
-            json_mode=True
+            system_prompt=SYSTEM_PROMPT, user_prompt=user_prompt, json_mode=True
         )
 
         # 5. Parse JSON response
         data = json.loads(response_text)
-        
+
         # Ensure reasoning trace integrates the LLM's reasoning + source metadata + LLM route trace
         model_reasoning = data.get("reasoning", "No model reasoning generated.")
-        full_reasoning = f"{model_reasoning} [Sources: {', '.join(sources)}]. {raw_trace}"
+        full_reasoning = (
+            f"{model_reasoning} [Sources: {', '.join(sources)}]. {raw_trace}"
+        )
 
         return {
             "response": data.get("response", "Could not formulate an answer."),
             "reasoning": full_reasoning,
-            "sources": sources
+            "sources": sources,
         }
 
     except Exception as e:
@@ -118,5 +117,5 @@ Retrieved Context:
         return {
             "response": "We are experiencing technical difficulties. Please consult a Guest Services staff member in a blue vest.",
             "reasoning": f"Fan Agent processing failed: {str(e)}",
-            "sources": sources
+            "sources": sources,
         }

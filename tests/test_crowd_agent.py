@@ -17,7 +17,7 @@ def test_load_stadium_state_success(mock_exists, mock_file):
     mock_exists.return_value = True
     content = load_stadium_state("stadium_state.json")
     assert "value" in content
-    mock_file.assert_called_once_with("stadium_state.json", "r", encoding="utf-8")
+    mock_file.assert_called_once_with("stadium_state.json", encoding="utf-8")
 
 
 @patch("backend.agents.crowd_agent.load_stadium_state")

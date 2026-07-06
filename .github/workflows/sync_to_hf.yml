@@ -22,6 +22,21 @@ jobs:
           rm -rf docs/demo-screenshots/*.jpg
           rm -rf docs/demo-screenshots/*.jpeg
           
+          # Dynamically inject Hugging Face configuration to the top of the README
+          cat << 'EOF' > hf_header.md
+          ---
+          title: WorldCup OS
+          emoji: ⚽
+          colorFrom: blue
+          colorTo: green
+          sdk: docker
+          pinned: false
+          ---
+          
+          EOF
+          cat README.md >> hf_header.md
+          mv hf_header.md README.md
+          
           # Nuke the heavy git history
           rm -rf .git
           

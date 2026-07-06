@@ -1,0 +1,27 @@
+# Python cache and byte-code
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.ruff_cache/
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+
+# Databases & local state
+backend/data/chroma_db/
+backend/data/stadium_state.json
+
+# Streamlit config/cache
+.streamlit/
+*.log
+
+# OS & Editors
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

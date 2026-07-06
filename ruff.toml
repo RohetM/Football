@@ -1,0 +1,11 @@
+# Ruff configuration for WorldCup OS
+line-length = 88
+target-version = "py310"
+
+[lint]
+# Enable Pyflakes (F), Pycodestyle (E, W), Isort (I), Pep8-naming (N), Pyupgrade (UP), Bugbear (B)
+select = ["E", "F", "I", "N", "UP", "B"]
+ignore = []
+
+[lint.isort]
+combine-as-imports = true

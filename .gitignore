@@ -17,7 +17,8 @@ backend/data/chroma_db/
 backend/data/stadium_state.json
 
 # Streamlit config/cache
-.streamlit/
+.streamlit/*
+!.streamlit/config.toml
 *.log
 
 # OS & Editors

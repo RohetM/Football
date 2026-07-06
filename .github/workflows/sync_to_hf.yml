@@ -15,9 +15,12 @@ jobs:
           
       - name: Prepare fresh codebase (Remove large media & history)
         run: |
-          # Delete the large video files from the runner so they aren't sent to HF
+          # Delete ALL media files from the runner so HF doesn't complain about binaries
           rm -rf docs/demo-screenshots/*.mp4
           rm -rf docs/demo-screenshots/*.webp
+          rm -rf docs/demo-screenshots/*.png
+          rm -rf docs/demo-screenshots/*.jpg
+          rm -rf docs/demo-screenshots/*.jpeg
           
           # Nuke the heavy git history
           rm -rf .git

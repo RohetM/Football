@@ -5,7 +5,7 @@ FROM python:3.11-slim
 WORKDIR /app
 
 # Copy your repository files into the container
-COPY . https://github.com/RohetM/Football.git.
+COPY . .
 
 # Install dependencies (ignoring cache to save space)
 RUN pip install --no-cache-dir -r requirements.txt

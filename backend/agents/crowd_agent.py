@@ -6,33 +6,44 @@ analysis and operational recommendations.
 """
 
 import json
+import logging
 import os
 from typing import Any
 
 from backend.agents.llm import call_llm
 
+logger = logging.getLogger(__name__)
+
 DEFAULT_STATE_PATH = os.path.join(
     os.path.dirname(os.path.dirname(__file__)), "data", "stadium_state.json"
 )
 
-SYSTEM_PROMPT = """You are the Crowd Intel Agent for "WorldCup OS," a GenAI tournament operations co-pilot.
+SYSTEM_PROMPT = """You are the Crowd Intel Agent for "WorldCup OS,"
+a GenAI tournament operations co-pilot.
 
-You analyze the live operational state of a FIFA World Cup stadium, which includes gate status and wait times, public transit delay metrics, plaza capacity utilization, and weather.
+You analyze the live operational state of a FIFA World Cup stadium, which includes
+gate status and wait times, public transit delay metrics, plaza capacity
+utilization, and weather.
 
-Your job is to identify the single most critical active or developing crowd bottleneck and suggest real-time mitigation actions for stadium staff.
+Your job is to identify the single most critical active or developing crowd
+bottleneck and suggest real-time mitigation actions for stadium staff.
 
 Guidelines:
 1. Examine all metrics:
    - "CRITICAL" plaza crowd levels (utilization > 80%).
    - Long wait times at gates (> 30 minutes).
    - "DELAYED" transit lines.
-2. Recommend concrete actions (e.g., "Open Gate C to general admission," "Update signage in North Plaza to direct fans to Concourse West," "Deploy shuttles to alleviate Metro Line 1 delay").
+2. Recommend concrete actions (e.g., "Open Gate C to general admission",
+   "Update signage in North Plaza to direct fans to Concourse West",
+   "Deploy shuttles to alleviate Metro Line 1 delay").
 3. You MUST return a structured JSON response with these keys:
    - "issue": Description of the bottleneck or transit failure.
-   - "eta_minutes": Estimated time (integer) for the bottleneck to peak or duration of the transit delay.
+   - "eta_minutes": Estimated time (integer) for the bottleneck to peak
+     or duration of the transit delay.
    - "recommended_action": Concrete mitigation steps for stadium stewards.
    - "confidence": String ("HIGH", "MEDIUM", or "LOW").
-   - "reasoning": Short explanation of how you derived this (mentioning wait times, plazas, or transit lines).
+   - "reasoning": Short explanation of how you derived this (mentioning wait
+     times, plazas, or transit lines).
 
 JSON format:
 {
@@ -89,11 +100,13 @@ def query_crowd_agent(file_path: str = DEFAULT_STATE_PATH) -> dict[str, Any]:
         return analysis
 
     except Exception as e:
-        print(f"Error in Crowd Intel Agent: {e}")
+        logger.error("Error in Crowd Intel Agent: %s", e, exc_info=True)
         return {
             "issue": "Unable to parse operational data stream.",
             "eta_minutes": 0,
-            "recommended_action": "Initiate manual crowd monitoring and physical patrols.",
+            "recommended_action": (
+                "Initiate manual crowd monitoring and physical patrols."
+            ),
             "confidence": "LOW",
             "reasoning": f"Crowd Intel Agent exception: {str(e)}",
         }

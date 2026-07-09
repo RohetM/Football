@@ -5,10 +5,15 @@ the stadium_state.json file on a regular interval or per-call basis.
 """
 
 import json
+import logging
 import os
 import random
 from datetime import datetime
 from typing import Any
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Target state file path
 DEFAULT_STATE_PATH = os.path.join(
@@ -56,7 +61,7 @@ def mutate_state(state: dict[str, Any]) -> dict[str, Any]:
     state["last_updated"] = datetime.now().isoformat()
 
     # 2. Mutate gates
-    for gate_name, gate_info in state.get("gates", {}).items():
+    for _gate_name, gate_info in state.get("gates", {}).items():
         if gate_info["status"] == "OPEN":
             # Add or subtract wait time (keep between 5 and 60 minutes)
             wait_delta = random.choice([-3, -2, -1, 0, 1, 2, 3, 4])
@@ -76,7 +81,7 @@ def mutate_state(state: dict[str, Any]) -> dict[str, Any]:
             )
 
     # 3. Mutate transit
-    for line, info in state.get("transit", {}).items():
+    for _line, info in state.get("transit", {}).items():
         if info["status"] == "DELAYED":
             # Probability of delay resolving
             if random.random() < 0.15:
@@ -96,7 +101,7 @@ def mutate_state(state: dict[str, Any]) -> dict[str, Any]:
                 info["description"] = "Delays due to passenger congestion"
 
     # 4. Mutate plazas
-    for plaza, info in state.get("plazas", {}).items():
+    for _plaza, info in state.get("plazas", {}).items():
         cap = info["capacity_utilization"]
         delta = random.choice([-0.05, -0.02, 0.0, 0.02, 0.05])
         new_cap = max(0.1, min(0.98, cap + delta))
@@ -132,15 +137,15 @@ def run_simulator_once(file_path: str = DEFAULT_STATE_PATH) -> None:
         state = load_state(file_path)
         updated_state = mutate_state(state)
         save_state(updated_state, file_path)
-        print(f"Simulator successfully mutated state in: {file_path}")
+        logger.info("Simulator successfully mutated state in: %s", file_path)
     except Exception as e:
-        print(f"Error in running simulator: {e}")
+        logger.error("Error in running simulator: %s", e, exc_info=True)
 
 
 if __name__ == "__main__":
     import time
 
-    print("Starting continuous stadium state simulator (Ctrl+C to stop)...")
+    logger.info("Starting continuous stadium state simulator (Ctrl+C to stop)...")
     while True:
         run_simulator_once()
         time.sleep(5)

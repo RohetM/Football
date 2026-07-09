@@ -6,10 +6,13 @@ generate a dispatch recommendation and reasoning trace.
 """
 
 import json
+import logging
 import os
 from typing import Any
 
 from backend.agents.llm import call_llm
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_STATE_PATH = os.path.join(
     os.path.dirname(os.path.dirname(__file__)), "data", "stadium_state.json"
@@ -27,9 +30,11 @@ ZONE_COORDINATES = {
     "West_Concourse": (-8, 0),
 }
 
-SYSTEM_PROMPT = """You are the Ops Agent for "WorldCup OS," a GenAI tournament operations co-pilot.
+SYSTEM_PROMPT = """You are the Ops Agent for "WorldCup OS,"
+a GenAI tournament operations co-pilot.
 
-Your role is to formulate dispatch recommendations for security, medical, and accessibility incidents at the stadium.
+Your role is to formulate dispatch recommendations for security, medical,
+and accessibility incidents at the stadium.
 
 You will be given:
 1. Incident Details (description, type, location).
@@ -37,12 +42,18 @@ You will be given:
 3. Complete Volunteer List (IDs, names, locations, statuses).
 
 Guidelines:
-1. Verify the recommended volunteer is indeed IDLE and closest. If no volunteers are IDLE, recommend the closest BUSY volunteer or manual escalation.
-2. Draft a clear dispatch notification message to send to the volunteer's mobile app.
+1. Verify the recommended volunteer is indeed IDLE and closest.
+   If no volunteers are IDLE, recommend the closest BUSY volunteer
+   or manual escalation.
+2. Draft a clear dispatch notification message to send to the volunteer's
+   mobile app.
 3. You MUST respond in a JSON format with exactly three keys:
-   - "recommendation": A clear command instructing the steward/volunteer on what to do.
-   - "assigned_volunteer_id": The ID of the chosen volunteer (or null if none could be assigned).
-   - "reasoning": A 1-2 sentence explanation of why they were chosen (mentioning location, status, and computed distance).
+   - "recommendation": A clear command instructing the steward/volunteer on
+     what to do.
+   - "assigned_volunteer_id": The ID of the chosen volunteer (or null if
+     none could be assigned).
+   - "reasoning": A 1-2 sentence explanation of why they were chosen
+     (mentioning location, status, and computed distance).
 
 JSON format:
 {
@@ -75,14 +86,15 @@ def compute_manhattan_distance(loc1: str, loc2: str) -> int:
 def get_nearest_volunteer(
     incident_location: str, volunteers: list[dict[str, Any]]
 ) -> tuple[dict[str, Any] | None, list[dict[str, Any]]]:
-    """Find the nearest idle volunteer and calculate distances for all volunteers.
+    """Find nearest idle volunteer and calculate distances.
 
     Args:
         incident_location: Zone where the incident occurred.
         volunteers: List of volunteers from the state file.
 
     Returns:
-        tuple: (nearest_idle_volunteer_or_none, list_of_volunteers_with_computed_distances)
+        tuple: (nearest_idle_volunteer_or_none,
+            list_of_volunteers_with_computed_distances)
     """
     calculated_list = []
     for vol in volunteers:
@@ -131,7 +143,7 @@ def query_ops_agent(
                 state = json.load(f)
                 volunteers = state.get("volunteers", [])
         except Exception as e:
-            print(f"Error loading state in Ops Agent: {e}")
+            logger.error("Error loading state in Ops Agent: %s", e, exc_info=True)
 
     # 2. Heuristically calculate nearest volunteer
     nearest, calculated_list = get_nearest_volunteer(incident_location, volunteers)
@@ -164,17 +176,29 @@ def query_ops_agent(
         return dispatch_decision
 
     except Exception as e:
-        print(f"Error in Ops Agent: {e}")
+        logger.error("Error in Ops Agent: %s", e, exc_info=True)
         # Programmatic fallback
         if nearest:
+            rec_msg = (
+                f"STeward/Volunteer {nearest['name']} ({nearest['id']}) "
+                f"report to {incident_location} for {incident_type} "
+                "assistance immediately."
+            )
             return {
-                "recommendation": f"STeward/Volunteer {nearest['name']} ({nearest['id']}) report to {incident_location} for {incident_type} assistance immediately.",
+                "recommendation": rec_msg,
                 "assigned_volunteer_id": nearest["id"],
-                "reasoning": f"Programmatic fallback dispatch due to LLM error: {str(e)}",
+                "reasoning": (
+                    f"Programmatic fallback dispatch due to LLM error: {str(e)}"
+                ),
             }
         else:
             return {
-                "recommendation": "No volunteers available. Escalate to Stadium Command Room.",
+                "recommendation": (
+                    "No volunteers available. Escalate to Stadium Command Room."
+                ),
                 "assigned_volunteer_id": None,
-                "reasoning": f"Programmatic fallback. No volunteers found in state. LLM error: {str(e)}",
+                "reasoning": (
+                    "Programmatic fallback. No volunteers found in state. "
+                    f"LLM error: {str(e)}"
+                ),
             }

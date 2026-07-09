@@ -5,11 +5,14 @@ Gemini (gemini-1.5-flash) if Groq returns errors or has quota issues.
 """
 
 import json
+import logging
 import os
 from typing import Any
 
 import google.generativeai as genai
 from groq import Groq
+
+logger = logging.getLogger(__name__)
 
 # Configuration constants
 GROQ_MODEL = "llama-3.3-70b-versatile"
@@ -79,25 +82,40 @@ def call_llm(
         if json_mode:
             mock_json = {
                 "response": "Stadium response (Offline Mode)",
-                "reasoning": "Offline mode triggered: no Groq or Gemini API keys detected in configuration.",
+                "reasoning": (
+                    "Offline mode triggered: no Groq or Gemini API keys "
+                    "detected in configuration."
+                ),
                 "issue": "Offline placeholder",
+                "text": "Stadium response (Offline Mode)",
                 "eta_minutes": 0,
-                "recommended_action": "Configure GROQ_API_KEY or GEMINI_API_KEY in .env",
+                "recommended_action": (
+                    "Configure GROQ_API_KEY or GEMINI_API_KEY in .env"
+                ),
                 "confidence": "LOW",
             }
             return (
                 json.dumps(mock_json),
-                "Reasoning: Offline fallback mock data generated because no LLM API keys are set.",
+                (
+                    "Reasoning: Offline fallback mock data generated "
+                    "because no LLM API keys are set."
+                ),
             )
         return (
-            "Stadium response (Offline Mode). Please set GROQ_API_KEY or GEMINI_API_KEY.",
-            "Reasoning: Offline fallback mock data generated because no LLM API keys are set.",
+            (
+                "Stadium response (Offline Mode). "
+                "Please set GROQ_API_KEY or GEMINI_API_KEY."
+            ),
+            (
+                "Reasoning: Offline fallback mock data generated "
+                "because no LLM API keys are set."
+            ),
         )
 
     # Try Groq first
     if groq_client:
         try:
-            print(f"Calling Groq LLM ({GROQ_MODEL})...")
+            logger.info("Calling Groq LLM (%s)...", GROQ_MODEL)
             kwargs: dict[str, Any] = {}
             if json_mode:
                 kwargs["response_format"] = {"type": "json_object"}
@@ -118,23 +136,28 @@ def call_llm(
             )
 
         except Exception as e:
-            print(
-                f"Groq API call failed or quota exceeded: {e}. Falling back to Gemini..."
+            logger.warning(
+                "Groq API call failed or quota exceeded: %s. "
+                "Falling back to Gemini...",
+                e,
             )
             # Fall through to Gemini
 
     # Try Gemini fallback
     if gemini_key:
         try:
-            print(f"Calling Gemini Fallback ({GEMINI_MODEL})...")
+            logger.info("Calling Gemini Fallback (%s)...", GEMINI_MODEL)
             model = get_gemini_model(system_prompt, json_mode)
             response = model.generate_content(user_prompt)
             return (
                 response.text,
-                f"Groq failed. Successfully executed fallback Gemini model ({GEMINI_MODEL}).",
+                (
+                    "Groq failed. Successfully executed fallback "
+                    f"Gemini model ({GEMINI_MODEL})."
+                ),
             )
         except Exception as e:
-            print(f"Gemini API call failed: {e}")
+            logger.error("Gemini API call failed: %s", e)
             raise RuntimeError(f"Both Groq and Gemini API calls failed: {e}") from e
 
     raise RuntimeError("Groq key was failed, and no Gemini API key configured.")

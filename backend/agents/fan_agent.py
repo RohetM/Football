@@ -6,26 +6,36 @@ structure with the answer and reasoning trace.
 """
 
 import json
+import logging
 from typing import Any
 
 from backend.agents.llm import call_llm
 from backend.rag.retriever import retrieve_context
 
-SYSTEM_PROMPT = """You are the Fan Agent for "WorldCup OS," an intelligent co-pilot assisting stadium fans for the FIFA World Cup 2026.
+logger = logging.getLogger(__name__)
 
-Your task is to answer fan questions accurately and helpfully, using ONLY the provided retrieved context from the stadium FAQ and policies database.
+SYSTEM_PROMPT = """You are the Fan Agent for "WorldCup OS," an intelligent co-pilot
+assisting stadium fans for the FIFA World Cup 2026.
+
+Your task is to answer fan questions accurately and helpfully, using ONLY the
+provided retrieved context from the stadium FAQ and policies database.
 
 Rules:
-1. Ground your answer strictly in the provided "Retrieved Context". Do not invent policies, hours, or gate recommendations.
-2. If the context does not contain enough info to answer the question, state politely that you do not have that information.
-3. Respond in the fan's requested target language (e.g., English, Spanish, French, etc.).
-4. Pay special attention to "Accessibility Needs". If wheelchair access, sensory accommodations, or other needs are specified:
+1. Ground your answer strictly in the provided "Retrieved Context". Do not
+   invent policies, hours, or gate recommendations.
+2. If the context does not contain enough info to answer the question, state
+   politely that you do not have that information.
+3. Respond in the fan's requested target language (e.g., English, Spanish,
+   French, etc.).
+4. Pay special attention to "Accessibility Needs". If wheelchair access,
+   sensory accommodations, or other needs are specified:
    - Highlight Gate C as the recommended ramp-free accessibility gate.
    - Advise them to seek Guest Services volunteers in blue vests.
    - Mention elevator locations and Section 112 sensory room if relevant.
 5. You MUST return a JSON object with exactly two keys:
    - "response": The detailed multilingual answer text.
-   - "reasoning": A short (1-2 sentences) explanation of which files/policies were retrieved to answer the question, explaining your rationale.
+   - "reasoning": A short (1-2 sentences) explanation of which files/policies
+     were retrieved to answer the question, explaining your rationale.
 
 JSON format:
 {
@@ -60,7 +70,7 @@ def format_context(context_docs: list[dict[str, Any]]) -> str:
 def query_fan_agent(
     query: str, language: str = "en", accessibility_needs: str | None = None
 ) -> dict[str, Any]:
-    """Process a fan query, retrieve RAG context, and get a localized, accessible response.
+    """Process a fan query, retrieve RAG context, and get response.
 
     Args:
         query: The raw fan question.
@@ -68,7 +78,7 @@ def query_fan_agent(
         accessibility_needs: Special accessibility requirements.
 
     Returns:
-        Dict[str, Any]: Response dictionary with "response", "reasoning", and "sources".
+        Dict[str, Any]: Response dictionary with keys: response, reasoning, sources.
     """
     # 1. Retrieve RAG context from local ChromaDB
     retrieved_docs = retrieve_context(query, n_results=3)
@@ -99,7 +109,8 @@ Retrieved Context:
         # 5. Parse JSON response
         data = json.loads(response_text)
 
-        # Ensure reasoning trace integrates the LLM's reasoning + source metadata + LLM route trace
+        # Ensure reasoning trace integrates the LLM's reasoning
+        # + source metadata + LLM route trace
         model_reasoning = data.get("reasoning", "No model reasoning generated.")
         full_reasoning = (
             f"{model_reasoning} [Sources: {', '.join(sources)}]. {raw_trace}"
@@ -112,10 +123,13 @@ Retrieved Context:
         }
 
     except Exception as e:
-        print(f"Error in Fan Agent: {e}")
+        logger.error("Error in Fan Agent: %s", e, exc_info=True)
         # Return fallback dictionary structure
         return {
-            "response": "We are experiencing technical difficulties. Please consult a Guest Services staff member in a blue vest.",
+            "response": (
+                "We are experiencing technical difficulties. "
+                "Please consult a Guest Services staff member in a blue vest."
+            ),
             "reasoning": f"Fan Agent processing failed: {str(e)}",
             "sources": sources,
         }

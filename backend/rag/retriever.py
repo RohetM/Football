@@ -4,11 +4,14 @@ Exposes functions to query the persisted vector database and return
 relevance-ranked document context.
 """
 
+import logging
 import os
 from typing import Any
 
 import chromadb
 from chromadb.utils import embedding_functions
+
+logger = logging.getLogger(__name__)
 
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))
 DB_DIR = os.getenv("CHROMA_DB_DIR", os.path.join(BASE_DIR, "data", "chroma_db"))
@@ -75,7 +78,7 @@ class RAGRetriever:
             return formatted_results
 
         except Exception as e:
-            print(f"Error querying ChromaDB: {e}")
+            logger.error("Error querying ChromaDB: %s", e, exc_info=True)
             return []
 
 
@@ -99,11 +102,10 @@ def retrieve_context(query: str, n_results: int = 3) -> list[dict[str, Any]]:
     """Convenience function to retrieve context for a query.
 
     Args:
-        query: Query string.
+        query: User question query.
         n_results: Number of results.
 
     Returns:
         List[Dict[str, Any]]: Retrieved context documents.
     """
-    retriever = get_retriever()
-    return retriever.retrieve(query, n_results=n_results)
+    return get_retriever().retrieve(query, n_results=n_results)
